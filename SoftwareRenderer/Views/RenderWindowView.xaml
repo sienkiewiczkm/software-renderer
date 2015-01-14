@@ -1,0 +1,6 @@
+﻿<Window x:Class="SoftwareRenderer.Views.RenderWindowView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Software Renderer" ResizeMode="NoResize" SizeToContent="WidthAndHeight">
+    <Image Name="RenderTarget" Width="320" Height="240" Source="{Binding Framebuffer}"/>
+</Window>
