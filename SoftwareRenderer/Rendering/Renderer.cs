@@ -18,9 +18,9 @@ namespace SoftwareRenderer.Rendering
             _camera = new Camera();
             _cubeMesh = MeshHelpers.GetCubeWireframe(2.0);
 
-            _camera.Position = VectorHelpers.Create(0, 3, 5);
+            _camera.Position = VectorHelpers.Create(3, 3, 5);
             _camera.LookAt = VectorHelpers.Create(0, 0, 0);
-            _camera.UpVector = VectorHelpers.Create(0, 0, 1);
+            _camera.UpVector = VectorHelpers.Create(0, 1, 0);
         }
 
         public void RenderFrame()

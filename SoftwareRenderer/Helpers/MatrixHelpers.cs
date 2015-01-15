@@ -14,15 +14,16 @@ namespace SoftwareRenderer.Helpers
         /// <returns></returns>
         public static Matrix<double> CalculateLookAt(Vector<double> position, Vector<double> lookAt, Vector<double> upVector)
         {
-            var zAxis = (position - lookAt).Normalize(2);
-            var xAxis = VectorHelpers.CrossProduct3D(upVector, zAxis).Normalize(2);
-            var yAxis = VectorHelpers.CrossProduct3D(zAxis, xAxis).Normalize(2);
+            var zAxis = (lookAt - position).Normalize(2);
+            var xAxis = VectorHelpers.CrossProduct3D(zAxis, upVector).Normalize(2);
+            var yAxis = VectorHelpers.CrossProduct3D(xAxis, zAxis).Normalize(2);
+
 
             return Matrix<double>.Build.DenseOfArray(new double[,] {
-                {xAxis[0], yAxis[0], zAxis[0], position[0]	},
-                {xAxis[1], yAxis[1], zAxis[1], position[1]	},
-                {xAxis[2], yAxis[2], zAxis[2], position[2]	},
-                {       0,        0,        0,          1	} 
+                {xAxis[0], yAxis[0], zAxis[0], -position[0] },
+                {xAxis[1], yAxis[1], zAxis[1], -position[1] },
+                {xAxis[2], yAxis[2], zAxis[2], -position[2] },
+                {       0,        0,        0,     1 } 
 			}).Inverse();
         }
 
