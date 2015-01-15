@@ -2,5 +2,5 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Software Renderer" ResizeMode="NoResize" SizeToContent="WidthAndHeight">
-    <Image Name="RenderTarget" Width="320" Height="240" Source="{Binding Framebuffer}"/>
+    <Image Name="RenderTarget" Width="200" Height="200" Source="{Binding Framebuffer}"/>
 </Window>

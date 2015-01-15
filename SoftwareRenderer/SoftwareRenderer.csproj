@@ -68,10 +68,14 @@
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Helpers\MatrixHelpers.cs" />
+    <Compile Include="Helpers\MeshHelpers.cs" />
     <Compile Include="Helpers\VectorHelpers.cs" />
     <Compile Include="Rendering\Camera.cs" />
-    <Compile Include="Rendering\Model.cs" />
-    <Compile Include="Rendering\Primitives.cs" />
+    <Compile Include="Rendering\IRenderWindow.cs" />
+    <Compile Include="Rendering\Primitive.cs" />
+    <Compile Include="Rendering\Renderer.cs" />
+    <Compile Include="Rendering\WireframeMesh.cs" />
     <Compile Include="ViewModels\RenderWindowViewModel.cs" />
     <Compile Include="Views\RenderWindowView.xaml.cs">
       <DependentUpon>RenderWindowView.xaml</DependentUpon>
