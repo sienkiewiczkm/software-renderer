@@ -2,6 +2,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using SoftwareRenderer.Logic;
@@ -13,6 +14,8 @@ namespace SoftwareRenderer.ViewModels
     public class RenderWindowViewModel : INotifyPropertyChanged, IRenderWindow
     {
         private readonly RenderWindowView _view;
+        private ToolboxViewModel _toolboxViewModel;
+
         private readonly Renderer _renderer;
         private readonly IUpdateable _sceneUpdater;
 
@@ -58,6 +61,8 @@ namespace SoftwareRenderer.ViewModels
         {
             CreateBuffers(512, 512);
         }
+
+        private bool _once;
 
         public async void MainLoop()
         {
