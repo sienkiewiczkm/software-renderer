@@ -3,8 +3,8 @@ using MathNet.Numerics.LinearAlgebra;
 
 namespace SoftwareRenderer.Helpers
 {
-	public static class MatrixHelpers
-	{
+    public static class MatrixHelpers
+    {
         /// <summary>
         /// Calculates look at vector
         /// </summary>
@@ -24,7 +24,7 @@ namespace SoftwareRenderer.Helpers
                 {xAxis[1], yAxis[1], zAxis[1], -position[1] },
                 {xAxis[2], yAxis[2], zAxis[2], -position[2] },
                 {       0,        0,        0,     1 } 
-			}).Inverse();
+            }).Inverse();
         }
 
         /// <summary>
@@ -47,6 +47,46 @@ namespace SoftwareRenderer.Helpers
             });
         }
 
+        public static Matrix<double> RotationX(double angle)
+        {
+            var cos = Math.Cos(angle);
+            var sin = Math.Sin(angle);
 
-	}
+            return Matrix<double>.Build.DenseOfArray(new double[,] {
+                {   1,   0,    0, 0 },
+                {   0, cos, -sin, 0 },
+                {   0, sin,  cos, 0 },
+                {   0,   0,    0, 1 }
+            });
+        }
+
+        public static Matrix<double> RotationY(double angle)
+        {
+            var cos = Math.Cos(angle);
+            var sin = Math.Sin(angle);
+
+            return Matrix<double>.Build.DenseOfArray(new double[,] {
+                {  cos, 0,  sin, 0 },
+                {    0, 1,    0, 0 },
+                { -sin, 0,  cos, 0 },
+                {    0, 0,    0, 1 }
+            });
+        }
+
+        public static Matrix<double> RotationZ(double angle)
+        {
+            var cos = Math.Cos(angle);
+            var sin = Math.Sin(angle);
+
+            return Matrix<double>.Build.DenseOfArray(new double[,] {
+                {  cos, -sin, 0, 0 },
+                {  sin,  cos, 0, 0 },
+                {    0,    0, 1, 0 },
+                {    0,    0, 0, 1 }
+            });
+        }
+
+
+
+    }
 }

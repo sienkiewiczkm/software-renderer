@@ -1,15 +1,19 @@
-﻿using System.Windows.Media;
+﻿using System;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using SoftwareRenderer.Helpers;
+using SoftwareRenderer.Logic;
 
 namespace SoftwareRenderer.Rendering
 {
-    public class Renderer
+    public class Renderer : IUpdateable
     {
         private readonly IRenderWindow _renderWindow;
 
         private readonly WireframeMesh _cubeMesh;
         private readonly Camera _camera;
+
+        private double _angle;
 
         public Renderer(IRenderWindow renderWindow)
         {
@@ -23,13 +27,19 @@ namespace SoftwareRenderer.Rendering
             _camera.UpVector = VectorHelpers.Create(0, 1, 0);
         }
 
+        public void Update(TimeSpan elapsedTime)
+        {
+            _angle += elapsedTime.TotalSeconds;
+        }
+
         public void RenderFrame()
         {
             var viewMatrix = _camera.GetViewMatrix();
             var projMatrix = _camera.GetProjectionMatrix();
 
-            var projView = projMatrix * viewMatrix;
-
+            var modelMatrix = MatrixHelpers.RotationY(_angle);
+            var projView = projMatrix * viewMatrix * modelMatrix;
+   
             var rt = _renderWindow.Framebuffer;
             rt.Lock();
             rt.Clear(Colors.Black);

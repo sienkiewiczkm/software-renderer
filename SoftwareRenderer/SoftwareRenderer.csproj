@@ -71,6 +71,7 @@
     <Compile Include="Helpers\MatrixHelpers.cs" />
     <Compile Include="Helpers\MeshHelpers.cs" />
     <Compile Include="Helpers\VectorHelpers.cs" />
+    <Compile Include="Logic\IUpdateable.cs" />
     <Compile Include="Rendering\Camera.cs" />
     <Compile Include="Rendering\IRenderWindow.cs" />
     <Compile Include="Rendering\Primitive.cs" />
