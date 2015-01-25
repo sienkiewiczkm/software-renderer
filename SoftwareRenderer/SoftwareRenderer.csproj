@@ -60,6 +60,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Rendering\Mesh.cs" />
     <Compile Include="ViewModels\ToolboxViewModel.cs" />
     <Compile Include="Views\ToolboxView.xaml.cs">
       <DependentUpon>ToolboxView.xaml</DependentUpon>

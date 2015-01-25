@@ -18,7 +18,6 @@ namespace SoftwareRenderer.Helpers
             var xAxis = VectorHelpers.CrossProduct3D(zAxis, upVector).Normalize(2);
             var yAxis = VectorHelpers.CrossProduct3D(xAxis, zAxis).Normalize(2);
 
-
             return Matrix<double>.Build.DenseOfArray(new double[,] {
                 {xAxis[0], yAxis[0], zAxis[0], -position[0] },
                 {xAxis[1], yAxis[1], zAxis[1], -position[1] },
@@ -45,6 +44,8 @@ namespace SoftwareRenderer.Helpers
                 {	0,			0,		-(far+near)/(far-near), -(2*far*near)/(far-near) },
                 {	0,			0,		                    -1,                      0   }
             });
+
+           
         }
 
         public static Matrix<double> RotationX(double angle)
