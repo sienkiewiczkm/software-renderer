@@ -98,6 +98,15 @@ namespace SoftwareRenderer.Rendering
             var hw = rt.PixelWidth*0.5;
             var hh = rt.PixelHeight*0.5;
 
+            var zbuffer = new double[rt.PixelWidth, rt.PixelHeight];
+            for (int y = 0; y < rt.PixelHeight; ++y)
+            {
+                for (int x = 0; x < rt.PixelWidth; ++x)
+                {
+                    zbuffer[x, y] = Double.MaxValue;
+                }
+            }
+
             for (var i = 0; i + 2 < _cube.Vertices.Count; i += 3)
             {
                 var a = (projView * _cube.Vertices[i + 0].Position.ExtendVector()).ToCartesian()
@@ -107,11 +116,7 @@ namespace SoftwareRenderer.Rendering
                 var c = (projView * _cube.Vertices[i + 2].Position.ExtendVector()).ToCartesian()
                     .Add(1.0).PointwiseMultiply(VectorHelpers.Create(hw, hh, 1.0)); ;
 
-                DrawScreenSpaceTriangle(rt, new Vector<double>[] { a, b, c });
-
-                //DrawLine3D(rt, projView, _cube.Vertices[i + 0].Position, _cube.Vertices[i + 1].Position, hw, hh);
-                //DrawLine3D(rt, projView, _cube.Vertices[i + 1].Position, _cube.Vertices[i + 2].Position, hw, hh);
-                //DrawLine3D(rt, projView, _cube.Vertices[i + 2].Position, _cube.Vertices[i + 0].Position, hw, hh);
+                DrawScreenSpaceTriangle(rt, zbuffer, new Vector<double>[] { a, b, c });
             }
 
             rt.Unlock();
@@ -125,12 +130,26 @@ namespace SoftwareRenderer.Rendering
             public double XSlope { get; set; }
         }
 
-        public void DrawScreenSpaceTriangle(WriteableBitmap rt, Vector<double>[] triangle)
+        public void DrawScreenSpaceTriangle(WriteableBitmap rt, double[,] zbuffer, Vector<double>[] triangle)
         {
             if (triangle.Length != 3)
             {
                 throw new ApplicationException("This is not a triangle.");
             }
+
+            DrawScreenSpaceTriangleInterpolated(rt, zbuffer, triangle[0][0], triangle[0][1], triangle[0][2],
+                triangle[1][0], triangle[1][1], triangle[1][2], triangle[2][0], triangle[2][1],
+                triangle[2][2], Colors.Red, Colors.Blue, Colors.Green);
+        }
+
+        public void DrawScreenSpaceTriangleInterpolated(WriteableBitmap rt, double[,] zbuffer,
+            double ax, double ay, double az, double bx, double by, double bz, double cx, double cy, double cz,
+            Color aColor, Color bColor, Color cColor)
+        {
+            var triangleArea = CalculateTriangleArea(ax, ay, bx, by, cx, cy);
+
+            var vertexX = new double[] { ax, bx, cx };
+            var vertexY = new double[] { ay, by, cy };
 
             var scanEdges = new List<ScanEdge>();
 
@@ -138,19 +157,28 @@ namespace SoftwareRenderer.Rendering
             {
                 int next = (current + 1) % 3;
 
-                Vector<double> higher = triangle[current];
-                Vector<double> lower = triangle[next];
+                double higherx, highery;
+                double lowerx, lowery;
 
-                if (higher[1] > lower[1])
+                if (vertexY[current] < vertexY[next])
                 {
-                    higher = triangle[next];
-                    lower = triangle[current];
+                    higherx = vertexX[current];
+                    highery = vertexY[current];
+                    lowerx = vertexX[next];
+                    lowery = vertexY[next];
+                }
+                else
+                {
+                    higherx = vertexX[next];
+                    highery = vertexY[next];
+                    lowerx = vertexX[current];
+                    lowery = vertexY[current];
                 }
 
-                int minY = (int)higher[1];
-                int maxY = (int)lower[1];
-                int startX = (int)higher[0];
-                int endX = (int)lower[0];
+                int minY = (int)highery;
+                int maxY = (int)lowery;
+                int startX = (int)higherx;
+                int endX = (int)lowerx;
 
                 if (minY == maxY)
                 {
@@ -161,7 +189,7 @@ namespace SoftwareRenderer.Rendering
                 scanEdge.MinimalY = minY;
                 scanEdge.MaximalY = maxY;
                 scanEdge.X = startX;
-                scanEdge.XSlope = (endX-startX)/((double)(maxY-minY));
+                scanEdge.XSlope = (endX - startX) / ((double)(maxY - minY));
 
                 scanEdges.Add(scanEdge);
             }
@@ -192,12 +220,46 @@ namespace SoftwareRenderer.Rendering
 
                 for (int i = 0; i < activeEdges.Count - 1; i += 2)
                 {
-                    rt.DrawLine((int)activeEdges[i].X, y, (int)activeEdges[i + 1].X, y, Colors.White);
+                    int startX = (int)activeEdges[i].X;
+                    int endX = (int)activeEdges[i + 1].X;
+
+                    for (int x = startX; x <= endX; ++x)
+                    {
+                        var aArea = CalculateTriangleArea(x, y, bx, by, cx, cy);
+                        var bArea = CalculateTriangleArea(ax, ay, x, y, cx, cy);
+                        var cArea = CalculateTriangleArea(ax, ay, bx, by, x, y);
+
+                        var fa = Math.Min(aArea / triangleArea, 1.0);
+                        var fb = Math.Min(bArea / triangleArea, 1.0);
+                        var fc = Math.Min(cArea / triangleArea, 1.0);
+
+                        var z = fa*az + fb*bz + fc*cz;
+
+                        if (zbuffer[x, y] < z)
+                        {
+                            continue;
+                        }
+
+                        zbuffer[x, y] = z;
+
+                        Color outputColor = new Color();
+                        outputColor.A = 255;
+                        outputColor.R = (byte)Math.Min((fa * aColor.R + fb * bColor.R + fc * cColor.R), 255.0);
+                        outputColor.G = (byte)Math.Min((fa * aColor.G + fb * bColor.G + fc * cColor.G), 255.0);
+                        outputColor.B = (byte)Math.Min((fa * aColor.B + fb * bColor.B + fc * cColor.B), 255.0);
+                        rt.SetPixel(x, y, outputColor);
+                    }
                 }
 
                 activeEdges.ForEach(t => t.X += t.XSlope);
             }
+        }
 
+        public double CalculateTriangleArea(double ax, double ay, double bx, double by, 
+            double cx, double cy)
+        {
+            var determinant = ax*by + ay*cx + bx*cy - ax*cy - ay*bx - by*cx;
+            return Math.Abs(determinant * 0.5);
         }
     }
 }
