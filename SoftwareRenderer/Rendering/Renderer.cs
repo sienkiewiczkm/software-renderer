@@ -31,6 +31,8 @@ namespace SoftwareRenderer.Rendering
 
         private double _angle;
 
+        public TriangleDirection VisibleTriangleDirection { get; set; }
+
         public void InitializeBuffers()
         {
             var width = _renderWindow.Framebuffer.PixelWidth;
@@ -57,6 +59,8 @@ namespace SoftwareRenderer.Rendering
             _camera.UpVector = VectorHelpers.Create(0, 1, 0);
 
             _clipper = new CohenSutherlandClipper();
+
+            VisibleTriangleDirection = TriangleDirection.Clockwise;
         }
 
         public void Update(TimeSpan elapsedTime)
@@ -142,10 +146,40 @@ namespace SoftwareRenderer.Rendering
                 triangle[2][2], Colors.Red, Colors.Blue, Colors.Green);
         }
 
+        public enum TriangleDirection
+        {
+            Clockwise,
+            CounterClockwise,
+            Indeterminable,
+        }
+
+        public TriangleDirection Determine2DTriangleDirection(double ax, double ay, double bx, double by, 
+            double cx, double cy)
+        {
+            var x1 = bx - ax;
+            var y1 = by - ay;
+            var x2 = cx - bx;
+            var y2 = cy - by;
+
+            double det = x1 * y2 - x2 * y1;
+
+            if (Math.Abs(det) < Double.Epsilon)
+            {
+                return TriangleDirection.Indeterminable;
+            }
+
+            return det > 0 ? TriangleDirection.Clockwise : TriangleDirection.CounterClockwise;
+        }
+
         public void DrawScreenSpaceTriangleInterpolated(WriteableBitmap rt, double[,] zbuffer,
             double ax, double ay, double az, double bx, double by, double bz, double cx, double cy, double cz,
             Color aColor, Color bColor, Color cColor)
         {
+            if (Determine2DTriangleDirection(ax, ay, bx, by, cx, cy) != VisibleTriangleDirection)
+            {
+                return;
+            }
+
             var triangleArea = CalculateTriangleArea(ax, ay, bx, by, cx, cy);
 
             var vertexX = new double[] { ax, bx, cx };
