@@ -129,7 +129,7 @@ namespace SoftwareRenderer.Rendering
                 DrawScreenSpaceTriangle(rt, zbuffer, new Vector<double>[] { a, b, c });
             }*/
 
-            RenderObjMesh(_objData, projView);
+            RenderObjMesh(_objData, projView, modelMatrix);
 
             rt.Unlock();
         }
@@ -154,7 +154,7 @@ namespace SoftwareRenderer.Rendering
                 triangle[2][2], Colors.Red, Colors.Blue, Colors.Green);
         }
 
-        public void RenderObjMesh(ObjData meshToRender, Matrix<double> transformation)
+        public void RenderObjMesh(ObjData meshToRender, Matrix<double> transformation, Matrix<double> normalTransformation)
         {
             var hw = _renderWindow.Framebuffer.PixelWidth * 0.5;
             var hh = _renderWindow.Framebuffer.PixelHeight * 0.5;
@@ -163,14 +163,38 @@ namespace SoftwareRenderer.Rendering
                 .Select(t => (transformation*t.ExtendVector()).ToCartesian().Add(1.0).PointwiseMultiply(VectorHelpers.Create(hw, hh, 1.0)))
                 .ToList();
 
-            var transformedMeshNormals = meshToRender.Normals.ToList();
+            var transformedMeshNormals = meshToRender.Normals
+                .Select(t => (normalTransformation * t.ExtendVector()).ToCartesian().Normalize(2))
+                .ToList();
+
+            var sunlight = Vector<double>.Build.DenseOfArray(new[] { 1.0, 0.0, 0.0 });
 
             foreach (var triangle in meshToRender.Triangles)
             {
-                DrawScreenSpaceTriangle(_renderWindow.Framebuffer, _zBuffer, new[] { 
+                var tri = new[] 
+                { 
                     transformedMeshVertices[triangle.Vertices[0]],
                     transformedMeshVertices[triangle.Vertices[1]],
-                    transformedMeshVertices[triangle.Vertices[2]] });
+                    transformedMeshVertices[triangle.Vertices[2]] 
+                };
+
+                var light1 = Math.Max(sunlight.DotProduct(transformedMeshNormals[triangle.Normals[0]]), 0);
+                var light2 = Math.Max(sunlight.DotProduct(transformedMeshNormals[triangle.Normals[1]]), 0);
+                var light3 = Math.Max(sunlight.DotProduct(transformedMeshNormals[triangle.Normals[2]]), 0);
+
+                var blight1 = (byte)(255 * light1);
+                var blight2 = (byte)(255 * light2);
+                var blight3 = (byte)(255 * light3);
+
+                var c1 = Color.FromRgb(blight1, blight1, blight1);
+                var c2 = Color.FromRgb(blight2, blight2, blight2);
+                var c3 = Color.FromRgb(blight3, blight3, blight3);
+
+                DrawScreenSpaceTriangleInterpolated(_renderWindow.Framebuffer, _zBuffer,
+                    tri[0][0], tri[0][1], tri[0][2],
+                    tri[1][0], tri[1][1], tri[1][2], 
+                    tri[2][0], tri[2][1], tri[2][2],
+                    c1, c2, c3);
             }
         }
 
