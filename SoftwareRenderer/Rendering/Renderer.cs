@@ -9,31 +9,83 @@ using System.Linq;
 
 namespace SoftwareRenderer.Rendering
 {
+    public enum ScreenSpaceTriangleDirection
+    {
+        Clockwise,
+        CounterClockwise,
+        Indeterminable,
+    }
+
+    public class PreparedVertex
+    {
+        public double[] Coordinates { get; protected set; }
+        public double X { get { return Coordinates[0]; } set { Coordinates[0] = value; } }
+        public double Y { get { return Coordinates[1]; } set { Coordinates[1] = value; } }
+        public double Z { get { return Coordinates[2]; } set { Coordinates[2] = value; } }
+
+        public Color VertexColor { get; set; }
+
+        public PreparedVertex()
+        {
+            Coordinates = new double[3];
+        }
+
+        public void SetCoordinates(Vector<double> vector)
+        {
+            if (vector.Count < 3)
+            {
+                throw new ArgumentException("Vector must have at least 3 dimmensions.");
+            }
+
+            X = vector[0];
+            Y = vector[1];
+            Z = vector[2];
+        }
+    }
+
+    public class PreparedTriangle
+    {
+        public PreparedVertex[] Vertices { get; protected set; }
+
+        public PreparedTriangle()
+        {
+            Vertices = new PreparedVertex[3];
+            for (int i = 0; i < 3; ++i)
+            {
+                Vertices[i] = new PreparedVertex();
+            }
+        }
+
+        public ScreenSpaceTriangleDirection GetScreenSpaceDirection()
+        {
+            var x1 = Vertices[1].X - Vertices[0].X;
+            var y1 = Vertices[1].Y - Vertices[0].Y;
+            var x2 = Vertices[2].X - Vertices[1].X;
+            var y2 = Vertices[2].Y - Vertices[1].Y;
+
+            double det = x1 * y2 - x2 * y1;
+
+            if (Math.Abs(det) < Double.Epsilon)
+            {
+                return ScreenSpaceTriangleDirection.Indeterminable;
+            }
+
+            return det > 0 ? ScreenSpaceTriangleDirection.Clockwise : ScreenSpaceTriangleDirection.CounterClockwise;
+        }
+    }
+
     public class Renderer : IUpdateable
     {
-        //private struct FramebufferData
-        //{
-        //    public double Depth;
-        //    public int ColorARGB;
-        //    public double NormalX;
-        //    public double NormalY;
-        //    public double NormalZ;
-        //}
-
-        //private FramebufferData[,] _framebufferData;
-
         private readonly IRenderWindow _renderWindow;
-
-        //private readonly WireframeMesh _cubeWireframe;
-        private readonly Mesh _cube;
-
-        private readonly Camera _camera;
-
-        private double _angle;
-
         private double[,] _zBuffer;
 
-        public TriangleDirection VisibleTriangleDirection { get; set; }
+        private readonly Mesh _cube;
+
+        public Camera Camera { get; set; }
+
+        private double _angle;       
+
+        public ScreenSpaceTriangleDirection VisibleTriangleDirection { get; set; }
 
         public ObjData _objData;
 
@@ -41,7 +93,6 @@ namespace SoftwareRenderer.Rendering
         {
             var width = _renderWindow.Framebuffer.PixelWidth;
             var height = _renderWindow.Framebuffer.PixelHeight;
-            //_framebufferData = new FramebufferData[width, height];
         }
 
         public void ClearBuffers()
@@ -52,19 +103,16 @@ namespace SoftwareRenderer.Rendering
         {
             _renderWindow = renderWindow;
 
-            _camera = new Camera();
-            //_cubeWireframe = MeshHelpers.GetCubeWireframe(1.0);
+            Camera = new Camera();
             _cube = MeshHelpers.GetCube(1.0);
 
-            _camera.NearPlane = 0.1;
-            _camera.FarPlane = 200.0;
-            _camera.Position = VectorHelpers.Create(0, 5, -10);
-            _camera.LookAt = VectorHelpers.Create(0, 0, 0);
-            _camera.UpVector = VectorHelpers.Create(0, 1, 0);
+            Camera.NearPlane = 0.1;
+            Camera.FarPlane = 200.0;
+            Camera.Position = VectorHelpers.Create(0, 5, -10);
+            Camera.LookAt = VectorHelpers.Create(0, 0, 0);
+            Camera.UpVector = VectorHelpers.Create(0, 1, 0);
 
-            //_clipper = new CohenSutherlandClipper();
-
-            VisibleTriangleDirection = TriangleDirection.Clockwise;
+            VisibleTriangleDirection = ScreenSpaceTriangleDirection.Clockwise;
 
             _objData = ObjData.LoadFromFile("Data/Models/pawn.obj");
         }
@@ -74,29 +122,10 @@ namespace SoftwareRenderer.Rendering
             _angle += elapsedTime.TotalSeconds;
         }
 
-        //private CohenSutherlandClipper _clipper;
-
-        //public void DrawLine3D(WriteableBitmap rt, Matrix<double> transformation,
-        //    Vector<double> from, Vector<double> to, double hw, double hh)
-        //{
-        //    from = (transformation * from.ExtendVector()).ToCartesian();
-        //    to = (transformation * to.ExtendVector()).ToCartesian();
-
-        //    if (_clipper.Clip(from, to, out from, out to))
-        //    {
-        //        var fromx = (int) ((from[0] + 1)*hw);
-        //        var fromy = (int) ((from[1] + 1)*hh);
-        //        var tox = (int) ((to[0] + 1)*hw);
-        //        var toy = (int) ((to[1] + 1)*hh);
-
-        //        rt.DrawLine(fromx, fromy, tox, toy, Colors.White);
-        //    }
-        //}
-
         public void RenderFrame()
         {
-            var viewMatrix = _camera.GetViewMatrix();
-            var projMatrix = _camera.GetProjectionMatrix();
+            var viewMatrix = Camera.GetViewMatrix();
+            var projMatrix = Camera.GetProjectionMatrix();
 
             var modelMatrix = MatrixHelpers.RotationY(_angle);
             var projView = projMatrix * viewMatrix * modelMatrix;
@@ -117,41 +146,9 @@ namespace SoftwareRenderer.Rendering
                 }
             }
 
-            /*for (var i = 0; i + 2 < _cube.Vertices.Count; i += 3)
-            {
-                var a = (projView * _cube.Vertices[i + 0].Position.ExtendVector()).ToCartesian()
-                    .Add(1.0).PointwiseMultiply(VectorHelpers.Create(hw, hh, 1.0));
-                var b = (projView * _cube.Vertices[i + 1].Position.ExtendVector()).ToCartesian()
-                    .Add(1.0).PointwiseMultiply(VectorHelpers.Create(hw, hh, 1.0)); ;
-                var c = (projView * _cube.Vertices[i + 2].Position.ExtendVector()).ToCartesian()
-                    .Add(1.0).PointwiseMultiply(VectorHelpers.Create(hw, hh, 1.0)); ;
-
-                DrawScreenSpaceTriangle(rt, zbuffer, new Vector<double>[] { a, b, c });
-            }*/
-
             RenderObjMesh(_objData, projView, modelMatrix);
 
             rt.Unlock();
-        }
-
-        private class ScanEdge
-        {
-            public int MinimalY { get; set; }
-            public int MaximalY { get; set; }
-            public double X { get; set; }
-            public double XSlope { get; set; }
-        }
-
-        public void DrawScreenSpaceTriangle(WriteableBitmap rt, double[,] zbuffer, Vector<double>[] triangle)
-        {
-            if (triangle.Length != 3)
-            {
-                throw new ApplicationException("This is not a triangle.");
-            }
-
-            DrawScreenSpaceTriangleInterpolated(rt, zbuffer, triangle[0][0], triangle[0][1], triangle[0][2],
-                triangle[1][0], triangle[1][1], triangle[1][2], triangle[2][0], triangle[2][1],
-                triangle[2][2], Colors.Red, Colors.Blue, Colors.Green);
         }
 
         public void RenderObjMesh(ObjData meshToRender, Matrix<double> transformation, Matrix<double> normalTransformation)
@@ -171,71 +168,38 @@ namespace SoftwareRenderer.Rendering
 
             foreach (var triangle in meshToRender.Triangles)
             {
-                var tri = new[] 
-                { 
-                    transformedMeshVertices[triangle.Vertices[0]],
-                    transformedMeshVertices[triangle.Vertices[1]],
-                    transformedMeshVertices[triangle.Vertices[2]] 
-                };
+                var tri = new PreparedTriangle();
 
-                var light1 = Math.Max(sunlight.DotProduct(transformedMeshNormals[triangle.Normals[0]]), 0);
-                var light2 = Math.Max(sunlight.DotProduct(transformedMeshNormals[triangle.Normals[1]]), 0);
-                var light3 = Math.Max(sunlight.DotProduct(transformedMeshNormals[triangle.Normals[2]]), 0);
+                for (int i = 0; i < 3; ++i)
+                {
+                    // Vertex shader
+                    tri.Vertices[i].SetCoordinates(transformedMeshVertices[triangle.Vertices[i]]);
+                    var light = Math.Max(sunlight.DotProduct(transformedMeshNormals[triangle.Normals[i]]), 0);
+                    var blight = (byte)(255 * light);
+                    tri.Vertices[i].VertexColor = Color.FromRgb(blight, blight, blight);
+                    // End of vertex shader
+                }
 
-                var blight1 = (byte)(255 * light1);
-                var blight2 = (byte)(255 * light2);
-                var blight3 = (byte)(255 * light3);
-
-                var c1 = Color.FromRgb(blight1, blight1, blight1);
-                var c2 = Color.FromRgb(blight2, blight2, blight2);
-                var c3 = Color.FromRgb(blight3, blight3, blight3);
-
-                DrawScreenSpaceTriangleInterpolated(_renderWindow.Framebuffer, _zBuffer,
-                    tri[0][0], tri[0][1], tri[0][2],
-                    tri[1][0], tri[1][1], tri[1][2], 
-                    tri[2][0], tri[2][1], tri[2][2],
-                    c1, c2, c3);
+                DrawScreenSpaceTriangleInterpolated(tri);
             }
         }
 
-        public enum TriangleDirection
+        public void DrawScreenSpaceTriangleInterpolated(PreparedTriangle triangle)
         {
-            Clockwise,
-            CounterClockwise,
-            Indeterminable,
-        }
+            WriteableBitmap rt = _renderWindow.Framebuffer;
 
-        public TriangleDirection Determine2DTriangleDirection(double ax, double ay, double bx, double by, 
-            double cx, double cy)
-        {
-            var x1 = bx - ax;
-            var y1 = by - ay;
-            var x2 = cx - bx;
-            var y2 = cy - by;
-
-            double det = x1 * y2 - x2 * y1;
-
-            if (Math.Abs(det) < Double.Epsilon)
-            {
-                return TriangleDirection.Indeterminable;
-            }
-
-            return det > 0 ? TriangleDirection.Clockwise : TriangleDirection.CounterClockwise;
-        }
-
-        public void DrawScreenSpaceTriangleInterpolated(WriteableBitmap rt, double[,] zbuffer,
-            double ax, double ay, double az, double bx, double by, double bz, double cx, double cy, double cz,
-            Color aColor, Color bColor, Color cColor)
-        {
-            if (Determine2DTriangleDirection(ax, ay, bx, by, cx, cy) != VisibleTriangleDirection)
+            if (triangle.GetScreenSpaceDirection() != VisibleTriangleDirection)
             {
                 return;
             }
 
-            var triangleArea = CalculateTriangleArea(ax, ay, bx, by, cx, cy);
+            var triangleArea = CalculateTriangleArea(
+                triangle.Vertices[0].X, triangle.Vertices[0].Y, 
+                triangle.Vertices[1].X, triangle.Vertices[1].Y,
+                triangle.Vertices[2].X, triangle.Vertices[2].Y);
 
-            var vertexX = new double[] { ax, bx, cx };
-            var vertexY = new double[] { ay, by, cy };
+            var vertexX = new double[] { triangle.Vertices[0].X, triangle.Vertices[1].X, triangle.Vertices[2].X };
+            var vertexY = new double[] { triangle.Vertices[0].Y, triangle.Vertices[1].Y, triangle.Vertices[2].Y };
 
             var scanEdges = new List<ScanEdge>();
 
@@ -316,28 +280,43 @@ namespace SoftwareRenderer.Rendering
 
                     for (int x = startX; x <= endX; ++x)
                     {
-                        var aArea = CalculateTriangleArea(x, y, bx, by, cx, cy);
-                        var bArea = CalculateTriangleArea(ax, ay, x, y, cx, cy);
-                        var cArea = CalculateTriangleArea(ax, ay, bx, by, x, y);
+                        var aArea = CalculateTriangleArea(
+                            x, y,
+                            triangle.Vertices[1].X, triangle.Vertices[1].Y,
+                            triangle.Vertices[2].X, triangle.Vertices[2].Y);
+
+                        var bArea = CalculateTriangleArea(
+                            triangle.Vertices[0].X, triangle.Vertices[0].Y,
+                            x, y,
+                            triangle.Vertices[2].X, triangle.Vertices[2].Y);
+
+                        var cArea = CalculateTriangleArea(
+                            triangle.Vertices[0].X, triangle.Vertices[0].Y,
+                            triangle.Vertices[1].X, triangle.Vertices[1].Y,
+                            x, y);
 
                         var fa = Math.Min(aArea / triangleArea, 1.0);
                         var fb = Math.Min(bArea / triangleArea, 1.0);
                         var fc = Math.Min(cArea / triangleArea, 1.0);
 
-                        var z = fa*az + fb*bz + fc*cz;
+                        var z = fa * triangle.Vertices[0].Z 
+                            + fb * triangle.Vertices[1].Z 
+                            + fc * triangle.Vertices[2].Z;
 
-                        if (zbuffer[x, y] < z)
+                        if (_zBuffer[x, y] < z)
                         {
                             continue;
                         }
 
-                        zbuffer[x, y] = z;
+                        _zBuffer[x, y] = z;
 
-                        Color outputColor = new Color();
-                        outputColor.A = 255;
-                        outputColor.R = (byte)Math.Min((fa * aColor.R + fb * bColor.R + fc * cColor.R), 255.0);
-                        outputColor.G = (byte)Math.Min((fa * aColor.G + fb * bColor.G + fc * cColor.G), 255.0);
-                        outputColor.B = (byte)Math.Min((fa * aColor.B + fb * bColor.B + fc * cColor.B), 255.0);
+                        // Pixel Shader
+                        Color outputColor = InterpolateColor(
+                            fa, triangle.Vertices[0].VertexColor,
+                            fb, triangle.Vertices[1].VertexColor,
+                            fc, triangle.Vertices[2].VertexColor);
+                        // End of pixel shader
+
                         rt.SetPixel(x, y, outputColor);
                     }
                 }
@@ -346,11 +325,32 @@ namespace SoftwareRenderer.Rendering
             }
         }
 
+        public Color InterpolateColor(double factorA, Color colorA, double factorB, Color colorB, double factorC, Color colorC)
+        {
+            var rChannel = factorA * colorA.R + factorB * colorB.R + factorC * colorC.R;
+            var gChannel = factorA * colorA.G + factorB * colorB.G + factorC * colorC.G;
+            var bChannel = factorA * colorA.B + factorB * colorB.B + factorC * colorC.B;
+
+            rChannel = Math.Min(rChannel, 255.0);
+            gChannel = Math.Min(gChannel, 255.0);
+            bChannel = Math.Min(bChannel, 255.0);
+
+            return Color.FromRgb((byte)rChannel, (byte)gChannel, (byte)bChannel);
+        }
+
         public double CalculateTriangleArea(double ax, double ay, double bx, double by, 
             double cx, double cy)
         {
             var determinant = ax*by + ay*cx + bx*cy - ax*cy - ay*bx - by*cx;
             return Math.Abs(determinant * 0.5);
+        }
+
+        private class ScanEdge
+        {
+            public int MinimalY { get; set; }
+            public int MaximalY { get; set; }
+            public double X { get; set; }
+            public double XSlope { get; set; }
         }
     }
 }
