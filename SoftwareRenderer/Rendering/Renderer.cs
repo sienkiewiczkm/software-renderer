@@ -23,11 +23,16 @@ namespace SoftwareRenderer.Rendering
         public double Y { get { return Coordinates[1]; } set { Coordinates[1] = value; } }
         public double Z { get { return Coordinates[2]; } set { Coordinates[2] = value; } }
 
+        public double[] TextureCoordinates { get; protected set; }
+        public double U { get { return TextureCoordinates[0]; } set { TextureCoordinates[0] = value; } }
+        public double V { get { return TextureCoordinates[1]; } set { TextureCoordinates[1] = value; } }
+
         public Color VertexColor { get; set; }
 
         public PreparedVertex()
         {
             Coordinates = new double[3];
+            TextureCoordinates = new double[2];
         }
 
         public void SetCoordinates(Vector<double> vector)
@@ -40,6 +45,17 @@ namespace SoftwareRenderer.Rendering
             X = vector[0];
             Y = vector[1];
             Z = vector[2];
+        }
+
+        public void SetTextureCoordinates(Vector<double> vector)
+        {
+            if (vector.Count < 2)
+            {
+                throw new ArgumentException("Vector must have at least 2 dimmensions.");
+            }
+
+            U = vector[0];
+            V = vector[1];
         }
     }
 
@@ -79,8 +95,6 @@ namespace SoftwareRenderer.Rendering
         private readonly IRenderWindow _renderWindow;
         private double[,] _zBuffer;
 
-        private readonly Mesh _cube;
-
         public Camera Camera { get; set; }
 
         private double _angle;       
@@ -95,6 +109,9 @@ namespace SoftwareRenderer.Rendering
             var height = _renderWindow.Framebuffer.PixelHeight;
         }
 
+        public bool TexturingEnabled { get; set; }
+        WriteableBitmap Texture { get; set; }
+
         public void ClearBuffers()
         {
         }
@@ -104,7 +121,6 @@ namespace SoftwareRenderer.Rendering
             _renderWindow = renderWindow;
 
             Camera = new Camera();
-            _cube = MeshHelpers.GetCube(1.0);
 
             Camera.NearPlane = 0.1;
             Camera.FarPlane = 200.0;
@@ -115,6 +131,9 @@ namespace SoftwareRenderer.Rendering
             VisibleTriangleDirection = ScreenSpaceTriangleDirection.Clockwise;
 
             _objData = ObjData.LoadFromFile("Data/Models/pawn.obj");
+
+            Texture = new WriteableBitmap(new BitmapImage(new Uri("Data/Textures/wood.png", UriKind.Relative)));
+            TexturingEnabled = false;
         }
 
         public void Update(TimeSpan elapsedTime)
@@ -153,6 +172,11 @@ namespace SoftwareRenderer.Rendering
 
         public void RenderObjMesh(ObjData meshToRender, Matrix<double> transformation, Matrix<double> normalTransformation)
         {
+            if (TexturingEnabled)
+            {
+                Texture.Lock();
+            }
+
             var hw = _renderWindow.Framebuffer.PixelWidth * 0.5;
             var hh = _renderWindow.Framebuffer.PixelHeight * 0.5;
 
@@ -174,6 +198,8 @@ namespace SoftwareRenderer.Rendering
                 {
                     // Vertex shader
                     tri.Vertices[i].SetCoordinates(transformedMeshVertices[triangle.Vertices[i]]);
+                    tri.Vertices[i].SetTextureCoordinates(meshToRender.TexCoords[triangle.TexCoords[i]]);
+
                     var light = Math.Max(sunlight.DotProduct(transformedMeshNormals[triangle.Normals[i]]), 0);
                     var blight = (byte)(255 * light);
                     tri.Vertices[i].VertexColor = Color.FromRgb(blight, blight, blight);
@@ -181,6 +207,11 @@ namespace SoftwareRenderer.Rendering
                 }
 
                 DrawScreenSpaceTriangleInterpolated(tri);
+            }
+
+            if (TexturingEnabled)
+            {
+                Texture.Unlock();
             }
         }
 
@@ -315,6 +346,18 @@ namespace SoftwareRenderer.Rendering
                             fa, triangle.Vertices[0].VertexColor,
                             fb, triangle.Vertices[1].VertexColor,
                             fc, triangle.Vertices[2].VertexColor);
+
+                        if (TexturingEnabled)
+                        {
+                            var u = fa * triangle.Vertices[0].U + fb * triangle.Vertices[1].U + fc * triangle.Vertices[2].U;
+                            var v = fa * triangle.Vertices[0].V + fb * triangle.Vertices[1].V + fc * triangle.Vertices[2].V;
+
+                            u = Math.Min(Math.Max(u, 0.0), 1.0);
+                            v = Math.Min(Math.Max(v, 0.0), 1.0);
+
+                            Color texColor = Texture.GetPixel((int)(u * Texture.PixelWidth), (int)(v * Texture.PixelHeight));
+                            outputColor = MultiplyColors(outputColor, texColor);
+                        }
                         // End of pixel shader
 
                         rt.SetPixel(x, y, outputColor);
@@ -323,6 +366,24 @@ namespace SoftwareRenderer.Rendering
 
                 activeEdges.ForEach(t => t.X += t.XSlope);
             }
+        }
+
+        public Color MultiplyColors(Color a, Color b)
+        {
+            var aR = a.R / 255.0;
+            var aG = a.G / 255.0;
+            var aB = a.B / 255.0;
+
+            var bR = b.R / 255.0;
+            var bG = b.G / 255.0;
+            var bB = b.B / 255.0;
+
+            var fR = (byte)(aR * bR * 255);
+            var fG = (byte)(aG * bG * 255);
+            var fB = (byte)(aB * bB * 255);
+
+            return Color.FromRgb(fR, fG, fB);
+
         }
 
         public Color InterpolateColor(double factorA, Color colorA, double factorB, Color colorB, double factorC, Color colorC)

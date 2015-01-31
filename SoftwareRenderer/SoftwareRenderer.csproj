@@ -60,7 +60,6 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
-    <Compile Include="Rendering\Mesh.cs" />
     <Compile Include="Rendering\ObjData.cs" />
     <Compile Include="ViewModels\ToolboxViewModel.cs" />
     <Compile Include="Views\ToolboxView.xaml.cs">
@@ -76,15 +75,12 @@
     </Compile>
     <Compile Include="Helpers\MiscHelpers.cs" />
     <Compile Include="Helpers\MatrixHelpers.cs" />
-    <Compile Include="Helpers\MeshHelpers.cs" />
     <Compile Include="Helpers\VectorHelpers.cs" />
     <Compile Include="Logic\IUpdateable.cs" />
     <Compile Include="Rendering\Camera.cs" />
     <Compile Include="Rendering\CohenSutherlandClipper.cs" />
     <Compile Include="Rendering\IRenderWindow.cs" />
-    <Compile Include="Rendering\Primitive.cs" />
     <Compile Include="Rendering\Renderer.cs" />
-    <Compile Include="Rendering\WireframeMesh.cs" />
     <Compile Include="ViewModels\RenderWindowViewModel.cs" />
     <Compile Include="Views\RenderWindowView.xaml.cs">
       <DependentUpon>RenderWindowView.xaml</DependentUpon>

@@ -5,6 +5,11 @@ namespace SoftwareRenderer.Helpers
 {
     public static class VectorHelpers
     {
+        public static Vector<double> Create(double x, double y)
+        {
+            return Vector<double>.Build.DenseOfArray(new[] { x, y });
+        }
+
         public static Vector<double> Create(double x, double y, double z)
         {
             return Vector<double>.Build.DenseOfArray(new[] {x, y, z});
