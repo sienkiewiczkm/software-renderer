@@ -17,7 +17,7 @@ namespace SoftwareRenderer.ViewModels
         private ToolboxViewModel _toolboxViewModel;
 
         private readonly Renderer _renderer;
-        private readonly IUpdateable _sceneUpdater;
+        private readonly Scene _sceneUpdater;
 
         public RenderWindowViewModel()
         {
@@ -26,10 +26,10 @@ namespace SoftwareRenderer.ViewModels
                 DataContext = this,
             };
 
-            _renderer = new Renderer(this);
             Initialize();
 
-            _sceneUpdater = _renderer;
+            _renderer = new Renderer(this);
+            _sceneUpdater = new Scene(_renderer);
 
             _view.Show();
 
@@ -59,23 +59,97 @@ namespace SoftwareRenderer.ViewModels
 
         public void Initialize()
         {
-            CreateBuffers(512, 512);
+            CreateBuffers(320, 320);
         }
-
-        private bool _once;
 
         public async void MainLoop()
         {
             var previousTime = DateTime.UtcNow;
+            var timeCounter = new TimeSpan();
+            int frameCount = 0;
+
+            bool allowCameraChange = true;
+
             while (true)
             {
+                var cameraForwardMovement = 0.0;
+                var cameraSideMovement = 0.0;
+                var pawnForwardMovement = 0.0;
+                var pawnSideMovement = 0.0;
+
+                if (Keyboard.GetKeyStates(Key.W) == KeyStates.Down)
+                {
+                    cameraForwardMovement += 1.0;
+                }
+
+                if (Keyboard.GetKeyStates(Key.S) == KeyStates.Down)
+                {
+                    cameraForwardMovement -= 1.0;
+                }
+
+                if (Keyboard.GetKeyStates(Key.A) == KeyStates.Down)
+                {
+                    cameraSideMovement -= 1.0;
+                }
+
+                if (Keyboard.GetKeyStates(Key.D) == KeyStates.Down)
+                {
+                    cameraSideMovement += 1.0;
+                }
+
+                if (Keyboard.GetKeyStates(Key.T) == KeyStates.Down)
+                {
+                    pawnForwardMovement += 1.0;
+                }
+
+                if (Keyboard.GetKeyStates(Key.G) == KeyStates.Down)
+                {
+                    pawnForwardMovement -= 1.0;
+                }
+
+                if (Keyboard.GetKeyStates(Key.F) == KeyStates.Down)
+                {
+                    pawnSideMovement -= 1.0;
+                }
+
+                if (Keyboard.GetKeyStates(Key.H) == KeyStates.Down)
+                {
+                    pawnSideMovement += 1.0;
+                }
+
+                if (Keyboard.GetKeyStates(Key.Q) == KeyStates.Down)
+                {
+                    if (allowCameraChange)
+                    {
+                        _sceneUpdater.SwapCameras();
+                    }
+                    allowCameraChange = false;
+                }
+                else
+                {
+                    allowCameraChange = true;
+                }
+
+                _sceneUpdater.MoveCamera(cameraForwardMovement, cameraSideMovement);
+                _sceneUpdater.MovePawn(pawnForwardMovement, pawnSideMovement);
+
                 var currentTime = DateTime.UtcNow;
                 var elapsedTime = currentTime - previousTime;
                 previousTime = currentTime;
 
+                timeCounter += elapsedTime;
+                if (timeCounter.TotalSeconds > 1.0)
+                {
+                    _view.Title = "Software Renderer (FPS: " + frameCount + ")";
+                    timeCounter = new TimeSpan(0, 0, 0, 0, timeCounter.Milliseconds);
+                    frameCount = 0;
+                }
+
                 _sceneUpdater.Update(elapsedTime);
-                _renderer.RenderFrame();
-                await Task.Delay(5);
+                _sceneUpdater.Render();
+                frameCount++;
+
+                await Task.Delay(1);
             }
         }
 

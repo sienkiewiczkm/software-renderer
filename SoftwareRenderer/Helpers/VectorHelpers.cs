@@ -65,5 +65,15 @@ namespace SoftwareRenderer.Helpers
             oneDimmensionLarger[vector.Count] = extension;
             return oneDimmensionLarger;
         }
+
+        public static Vector<double> DiscardLastCoordinate(this Vector<double> vector)
+        {
+            var oneDimmensionSmaller = Vector<double>.Build.Dense(vector.Count - 1);
+            for (var i = 0; i < vector.Count-1; ++i)
+            {
+                oneDimmensionSmaller[i] = vector[i];
+            }
+            return oneDimmensionSmaller;
+        }
     }
 }

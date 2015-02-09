@@ -90,18 +90,73 @@ namespace SoftwareRenderer.Rendering
         }
     }
 
-    public class Renderer : IUpdateable
+    public class Material
+    {
+        public Color AmbientColor { get; set; }
+        public Color DiffuseColor { get; set; }
+        public Color SpecularColor { get; set; }
+        public double ShineFactor { get; set; }
+
+        public WriteableBitmap DiffuseTexture { get; set; }
+    }
+
+    public class PointLight
+    {
+        public Color Color { get; set; }
+        public Vector<double> Position { get; set; }
+
+        public double AttenuationConstantFactor { get; set; }
+        public double AttenuationLinearFactor { get; set; }
+        public double AttenuationQuadraticFactor { get; set; }
+
+        public PointLight()
+        {
+            AttenuationConstantFactor = 1.0;
+            AttenuationLinearFactor = 0.0;
+            AttenuationQuadraticFactor = 0.0;
+        }
+
+        public double GetAttenuationFactor(double distance)
+        {
+            return 1 / (AttenuationConstantFactor
+                + AttenuationLinearFactor * distance
+                + AttenuationQuadraticFactor * distance * distance);
+        }
+    }
+
+    public class Renderer
     {
         private readonly IRenderWindow _renderWindow;
         private double[,] _zBuffer;
 
-        public Camera Camera { get; set; }
-
-        private double _angle;       
-
         public ScreenSpaceTriangleDirection VisibleTriangleDirection { get; set; }
+        public bool TexturingEnabled { get; set; }
+        public Material Material { get; set; }
 
-        public ObjData _objData;
+        public List<PointLight> Lights { get; set; }
+
+        public Vector<double> WorldPositionEye { get; set; }
+
+        public bool AmbientLightingEnabled { get; set; }
+        public bool DiffuseLightingEnabled { get; set; }
+        public bool SpecularLightingEnabled { get; set; }
+
+        public Renderer(IRenderWindow renderWindow)
+        {
+            _renderWindow = renderWindow;
+
+            VisibleTriangleDirection = ScreenSpaceTriangleDirection.Clockwise;
+
+            //Texture = new WriteableBitmap(new BitmapImage(new Uri("Data/Textures/darkstone.png", UriKind.Relative)));
+            TexturingEnabled = false;
+            AmbientLightingEnabled = true;
+            DiffuseLightingEnabled = true;
+            SpecularLightingEnabled = true;
+
+            Lights = new List<PointLight>();
+
+            _zBuffer = new double[_renderWindow.Framebuffer.PixelWidth, _renderWindow.Framebuffer.PixelHeight];
+        }
 
         public void InitializeBuffers()
         {
@@ -109,86 +164,47 @@ namespace SoftwareRenderer.Rendering
             var height = _renderWindow.Framebuffer.PixelHeight;
         }
 
-        public bool TexturingEnabled { get; set; }
-        WriteableBitmap Texture { get; set; }
-
-        public void ClearBuffers()
-        {
-        }
-
-        public Renderer(IRenderWindow renderWindow)
-        {
-            _renderWindow = renderWindow;
-
-            Camera = new Camera();
-
-            Camera.NearPlane = 0.1;
-            Camera.FarPlane = 200.0;
-            Camera.Position = VectorHelpers.Create(0, 5, -10);
-            Camera.LookAt = VectorHelpers.Create(0, 0, 0);
-            Camera.UpVector = VectorHelpers.Create(0, 1, 0);
-
-            VisibleTriangleDirection = ScreenSpaceTriangleDirection.Clockwise;
-
-            _objData = ObjData.LoadFromFile("Data/Models/pawn.obj");
-
-            Texture = new WriteableBitmap(new BitmapImage(new Uri("Data/Textures/wood.png", UriKind.Relative)));
-            TexturingEnabled = false;
-        }
-
-        public void Update(TimeSpan elapsedTime)
-        {
-            _angle += elapsedTime.TotalSeconds;
-        }
-
-        public void RenderFrame()
-        {
-            var viewMatrix = Camera.GetViewMatrix();
-            var projMatrix = Camera.GetProjectionMatrix();
-
-            var modelMatrix = MatrixHelpers.RotationY(_angle);
-            var projView = projMatrix * viewMatrix * modelMatrix;
-   
+        public void BeginFrame()
+        {   
             var rt = _renderWindow.Framebuffer;
+
             rt.Lock();
             rt.Clear(Colors.Black);
 
             var hw = rt.PixelWidth*0.5;
             var hh = rt.PixelHeight*0.5;
 
-            _zBuffer = new double[rt.PixelWidth, rt.PixelHeight];
             for (int y = 0; y < rt.PixelHeight; ++y)
             {
                 for (int x = 0; x < rt.PixelWidth; ++x)
                 {
-                    _zBuffer[x, y] = Double.MaxValue;
+                    _zBuffer[x, y] = Double.MinValue;
                 }
             }
+        }
 
-            RenderObjMesh(_objData, projView, modelMatrix);
-
-            rt.Unlock();
+        public void EndFrame()
+        {
+            _renderWindow.Framebuffer.Unlock();
         }
 
         public void RenderObjMesh(ObjData meshToRender, Matrix<double> transformation, Matrix<double> normalTransformation)
         {
+            if (Material == null)
+            {
+                Material = new Material();
+            }
+
             if (TexturingEnabled)
             {
-                Texture.Lock();
+                if (Material.DiffuseTexture != null)
+                {
+                    Material.DiffuseTexture.Lock();
+                }
             }
 
             var hw = _renderWindow.Framebuffer.PixelWidth * 0.5;
             var hh = _renderWindow.Framebuffer.PixelHeight * 0.5;
-
-            var transformedMeshVertices = meshToRender.Vertices
-                .Select(t => (transformation*t.ExtendVector()).ToCartesian().Add(1.0).PointwiseMultiply(VectorHelpers.Create(hw, hh, 1.0)))
-                .ToList();
-
-            var transformedMeshNormals = meshToRender.Normals
-                .Select(t => (normalTransformation * t.ExtendVector()).ToCartesian().Normalize(2))
-                .ToList();
-
-            var sunlight = Vector<double>.Build.DenseOfArray(new[] { 1.0, 0.0, 0.0 });
 
             foreach (var triangle in meshToRender.Triangles)
             {
@@ -196,13 +212,68 @@ namespace SoftwareRenderer.Rendering
 
                 for (int i = 0; i < 3; ++i)
                 {
+                    Vector<double> modelSpacePosition = meshToRender.Vertices[triangle.Vertices[i]];
+                    Vector<double> modelSpaceNormal = meshToRender.Normals[triangle.Normals[i]];
+
+                    Vector<double> screenSpacePosition = (transformation * modelSpacePosition.ExtendVector())
+                        .ToCartesian()
+                        .Add(VectorHelpers.Create(1.0, 1.0, 0.0))
+                        .PointwiseMultiply(VectorHelpers.Create(hw, hh, 1.0));
+
+                    Vector<double> worldSpacePosition = (normalTransformation * modelSpacePosition.ExtendVector())
+                        .ToCartesian();
+                    Vector<double> worldSpaceNormal = (normalTransformation * modelSpaceNormal.ExtendVector(0.0))
+                        .DiscardLastCoordinate().Normalize(2);
+
                     // Vertex shader
-                    tri.Vertices[i].SetCoordinates(transformedMeshVertices[triangle.Vertices[i]]);
+                    tri.Vertices[i].SetCoordinates(screenSpacePosition);
                     tri.Vertices[i].SetTextureCoordinates(meshToRender.TexCoords[triangle.TexCoords[i]]);
 
-                    var light = Math.Max(sunlight.DotProduct(transformedMeshNormals[triangle.Normals[i]]), 0);
-                    var blight = (byte)(255 * light);
-                    tri.Vertices[i].VertexColor = Color.FromRgb(blight, blight, blight);
+                    var vR = 0;
+                    var vG = 0;
+                    var vB = 0;
+
+                    if (AmbientLightingEnabled)
+                    {
+                        vR += Material.AmbientColor.R;
+                        vG += Material.AmbientColor.G;
+                        vB += Material.AmbientColor.B;
+                    }
+
+                    if (DiffuseLightingEnabled || SpecularLightingEnabled)
+                    {
+                        foreach (var light in Lights)
+                        {
+                            var lightDirection = (light.Position - worldSpacePosition).Normalize(2);
+
+                            if (DiffuseLightingEnabled)
+                            {
+                                var diffuseLightFactor = Math.Max(lightDirection.DotProduct(worldSpaceNormal), 0);
+                                var fullSaturationDiffuseColor = MultiplyColors(light.Color, Material.DiffuseColor);
+
+                                vR += (byte)(fullSaturationDiffuseColor.R * diffuseLightFactor);
+                                vG += (byte)(fullSaturationDiffuseColor.G * diffuseLightFactor);
+                                vB += (byte)(fullSaturationDiffuseColor.B * diffuseLightFactor);
+                            }
+
+                            if (SpecularLightingEnabled)
+                            {
+                                var eyeDirection = (WorldPositionEye - worldSpacePosition).Normalize(2);
+                                var reflected = (2 * worldSpaceNormal.DotProduct(lightDirection) * worldSpaceNormal - lightDirection).Normalize(2);
+                                var specularLightFactor = Math.Pow(Math.Max(eyeDirection.DotProduct(reflected), 0), Material.ShineFactor);
+                                var fullSaturationSpecularColor = MultiplyColors(light.Color, Material.SpecularColor);
+
+                                vR += (byte)(fullSaturationSpecularColor.R * specularLightFactor);
+                                vG += (byte)(fullSaturationSpecularColor.G * specularLightFactor);
+                                vB += (byte)(fullSaturationSpecularColor.B * specularLightFactor);
+                            }
+                        }
+                    }
+
+                    tri.Vertices[i].VertexColor = Color.FromRgb(
+                        (byte)Math.Min(vR, 255),
+                        (byte)Math.Min(vG, 255), 
+                        (byte)Math.Min(vB, 255));
                     // End of vertex shader
                 }
 
@@ -211,11 +282,11 @@ namespace SoftwareRenderer.Rendering
 
             if (TexturingEnabled)
             {
-                Texture.Unlock();
+                Material.DiffuseTexture.Unlock();
             }
         }
 
-        public void DrawScreenSpaceTriangleInterpolated(PreparedTriangle triangle)
+        protected void DrawScreenSpaceTriangleInterpolated(PreparedTriangle triangle)
         {
             WriteableBitmap rt = _renderWindow.Framebuffer;
 
@@ -258,8 +329,8 @@ namespace SoftwareRenderer.Rendering
 
                 int minY = (int)highery;
                 int maxY = (int)lowery;
-                int startX = (int)higherx;
-                int endX = (int)lowerx;
+                //int startX = (int)higherx;
+                //int endX = (int)lowerx;
 
                 if (minY == maxY)
                 {
@@ -267,10 +338,10 @@ namespace SoftwareRenderer.Rendering
                 }
 
                 var scanEdge = new ScanEdge();
-                scanEdge.MinimalY = minY;
-                scanEdge.MaximalY = maxY;
-                scanEdge.X = startX;
-                scanEdge.XSlope = (endX - startX) / ((double)(maxY - minY));
+                scanEdge.MinimalY = (int)Math.Ceiling(highery);
+                scanEdge.MaximalY = (int)Math.Ceiling(lowery);
+                scanEdge.X = higherx;
+                scanEdge.XSlope = (lowerx - higherx) / ((double)(lowery - highery));
 
                 scanEdges.Add(scanEdge);
             }
@@ -306,8 +377,8 @@ namespace SoftwareRenderer.Rendering
 
                 for (int i = 0; i < activeEdges.Count - 1; i += 2)
                 {
-                    int startX = Math.Max((int)activeEdges[i].X, 0);
-                    int endX = Math.Min((int)activeEdges[i + 1].X, rt.PixelWidth-1);
+                    int startX = (int)Math.Ceiling(Math.Max(activeEdges[i].X, 0));
+                    int endX = (int)Math.Floor(Math.Min(activeEdges[i + 1].X, rt.PixelWidth-1));
 
                     for (int x = startX; x <= endX; ++x)
                     {
@@ -330,11 +401,47 @@ namespace SoftwareRenderer.Rendering
                         var fb = Math.Min(bArea / triangleArea, 1.0);
                         var fc = Math.Min(cArea / triangleArea, 1.0);
 
+                        if (fa + fb + fc > 1.0)
+                        {
+                            int lowestAreaIndex = 0;
+                            double lowestArea = fa;
+
+                            if (lowestArea > fb)
+                            {
+                                lowestAreaIndex = 1;
+                                lowestArea = fb;
+                            }
+
+                            if (lowestArea > fc)
+                            {
+                                lowestAreaIndex = 2;
+                                lowestArea = fc;
+                            }
+
+                            switch (lowestAreaIndex)
+                            {
+                                case 0:
+                                    fa = 1.0 - fb - fc;
+                                    break;
+                                case 1:
+                                    fb = 1.0 - fa - fc;
+                                    break;
+                                case 2:
+                                    fc = 1.0 - fa - fb;
+                                    break;
+                            }
+                        }
+
                         var z = fa * triangle.Vertices[0].Z 
                             + fb * triangle.Vertices[1].Z 
                             + fc * triangle.Vertices[2].Z;
 
-                        if (_zBuffer[x, y] < z)
+                        if (z <= 1.0)
+                        {
+                            continue;
+                        }
+
+                        if (_zBuffer[x, y] > z)
                         {
                             continue;
                         }
@@ -355,7 +462,8 @@ namespace SoftwareRenderer.Rendering
                             u = Math.Min(Math.Max(u, 0.0), 1.0);
                             v = Math.Min(Math.Max(v, 0.0), 1.0);
 
-                            Color texColor = Texture.GetPixel((int)(u * Texture.PixelWidth), (int)(v * Texture.PixelHeight));
+                            Color texColor = Material.DiffuseTexture.GetPixel((int)(u * Material.DiffuseTexture.PixelWidth), 
+                                (int)(v * Material.DiffuseTexture.PixelHeight));
                             outputColor = MultiplyColors(outputColor, texColor);
                         }
                         // End of pixel shader
@@ -368,7 +476,7 @@ namespace SoftwareRenderer.Rendering
             }
         }
 
-        public Color MultiplyColors(Color a, Color b)
+        protected Color MultiplyColors(Color a, Color b)
         {
             var aR = a.R / 255.0;
             var aG = a.G / 255.0;
@@ -386,7 +494,7 @@ namespace SoftwareRenderer.Rendering
 
         }
 
-        public Color InterpolateColor(double factorA, Color colorA, double factorB, Color colorB, double factorC, Color colorC)
+        protected Color InterpolateColor(double factorA, Color colorA, double factorB, Color colorB, double factorC, Color colorC)
         {
             var rChannel = factorA * colorA.R + factorB * colorB.R + factorC * colorC.R;
             var gChannel = factorA * colorA.G + factorB * colorB.G + factorC * colorC.G;
@@ -399,7 +507,7 @@ namespace SoftwareRenderer.Rendering
             return Color.FromRgb((byte)rChannel, (byte)gChannel, (byte)bChannel);
         }
 
-        public double CalculateTriangleArea(double ax, double ay, double bx, double by, 
+        protected double CalculateTriangleArea(double ax, double ay, double bx, double by, 
             double cx, double cy)
         {
             var determinant = ax*by + ay*cx + bx*cy - ax*cy - ay*bx - by*cx;

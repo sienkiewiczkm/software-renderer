@@ -60,6 +60,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Logic\Scene.cs" />
     <Compile Include="Rendering\ObjData.cs" />
     <Compile Include="ViewModels\ToolboxViewModel.cs" />
     <Compile Include="Views\ToolboxView.xaml.cs">

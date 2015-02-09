@@ -68,7 +68,7 @@ namespace SoftwareRenderer.Rendering
                             double y = Double.Parse(tokens[2], CultureInfo.InvariantCulture);
                             double z = Double.Parse(tokens[3], CultureInfo.InvariantCulture);
 
-                            obj.Vertices.Add(VectorHelpers.Create(x, -y, z));
+                            obj.Vertices.Add(VectorHelpers.Create(x, y, z));
                             break;
                         }
                         case "vt":

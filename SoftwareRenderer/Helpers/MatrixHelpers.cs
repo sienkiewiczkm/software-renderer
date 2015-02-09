@@ -19,9 +19,9 @@ namespace SoftwareRenderer.Helpers
             var yAxis = VectorHelpers.CrossProduct3D(xAxis, zAxis).Normalize(2);
 
             return Matrix<double>.Build.DenseOfArray(new double[,] {
-                {xAxis[0], yAxis[0], zAxis[0], -position[0] },
-                {xAxis[1], yAxis[1], zAxis[1], -position[1] },
-                {xAxis[2], yAxis[2], zAxis[2], -position[2] },
+                {xAxis[0], yAxis[0], zAxis[0], position[0] },
+                {xAxis[1], yAxis[1], zAxis[1], position[1] },
+                {xAxis[2], yAxis[2], zAxis[2], position[2] },
                 {       0,        0,        0,     1 } 
             }).Inverse();
         }
@@ -46,6 +46,16 @@ namespace SoftwareRenderer.Helpers
             });
 
            
+        }
+
+        public static Matrix<double> Translation(double x, double y, double z)
+        {
+            return Matrix<double>.Build.DenseOfArray(new double[,] {
+                { 1, 0, 0, x },
+                { 0, 1, 0, y },
+                { 0, 0, 1, z },
+                { 0, 0, 0, 1 },
+            });
         }
 
         public static Matrix<double> RotationX(double angle)
