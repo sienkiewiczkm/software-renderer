@@ -7,6 +7,7 @@ using SoftwareRenderer.Rendering;
 using SoftwareRenderer.Helpers;
 using System.Windows.Media;
 using MathNet.Numerics.LinearAlgebra;
+using System.Windows.Media.Imaging;
 
 namespace SoftwareRenderer.Logic
 {
@@ -72,6 +73,7 @@ namespace SoftwareRenderer.Logic
                 AmbientColor = Colors.Black,
                 DiffuseColor = Colors.Chartreuse,
                 SpecularColor = Colors.Gray,
+                DiffuseTexture = new WriteableBitmap(new BitmapImage(new Uri("Data/Textures/darkstone.png", UriKind.Relative))),
                 ShineFactor = 128.0,
             });
 
@@ -88,6 +90,7 @@ namespace SoftwareRenderer.Logic
                 AmbientColor = Color.FromRgb(16,16,16),
                 DiffuseColor = Colors.RosyBrown,
                 SpecularColor = Colors.White,
+                DiffuseTexture = new WriteableBitmap(new BitmapImage(new Uri("Data/Textures/wood.png", UriKind.Relative))),
                 ShineFactor = 1.0,
             });
 

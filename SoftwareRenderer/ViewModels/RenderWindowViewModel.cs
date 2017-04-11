@@ -59,7 +59,7 @@ namespace SoftwareRenderer.ViewModels
 
         public void Initialize()
         {
-            CreateBuffers(320, 320);
+            CreateBuffers(1024, 1024);
         }
 
         public async void MainLoop()
@@ -140,7 +140,7 @@ namespace SoftwareRenderer.ViewModels
                 timeCounter += elapsedTime;
                 if (timeCounter.TotalSeconds > 1.0)
                 {
-                    _view.Title = "Software Renderer (FPS: " + frameCount + ")";
+                    _view.Title = "Software Renderer";// " FPS:" + frameCount + ")";
                     timeCounter = new TimeSpan(0, 0, 0, 0, timeCounter.Milliseconds);
                     frameCount = 0;
                 }

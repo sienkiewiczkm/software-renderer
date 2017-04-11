@@ -148,7 +148,7 @@ namespace SoftwareRenderer.Rendering
             VisibleTriangleDirection = ScreenSpaceTriangleDirection.Clockwise;
 
             //Texture = new WriteableBitmap(new BitmapImage(new Uri("Data/Textures/darkstone.png", UriKind.Relative)));
-            TexturingEnabled = false;
+            TexturingEnabled = true;
             AmbientLightingEnabled = true;
             DiffuseLightingEnabled = true;
             SpecularLightingEnabled = true;
@@ -280,7 +280,7 @@ namespace SoftwareRenderer.Rendering
                 DrawScreenSpaceTriangleInterpolated(tri);
             }
 
-            if (TexturingEnabled)
+            if (TexturingEnabled && Material.DiffuseTexture != null)
             {
                 Material.DiffuseTexture.Unlock();
             }
@@ -454,7 +454,7 @@ namespace SoftwareRenderer.Rendering
                             fb, triangle.Vertices[1].VertexColor,
                             fc, triangle.Vertices[2].VertexColor);
 
-                        if (TexturingEnabled)
+                        if (TexturingEnabled && Material.DiffuseTexture != null)
                         {
                             var u = fa * triangle.Vertices[0].U + fb * triangle.Vertices[1].U + fc * triangle.Vertices[2].U;
                             var v = fa * triangle.Vertices[0].V + fb * triangle.Vertices[1].V + fc * triangle.Vertices[2].V;
